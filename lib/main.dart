@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'database_helper.dart';
+import 'dart:typed_data';
+import 'package:demo/object_detection.dart'; // Replace with the correct import
 
 void main() {
   runApp(MyApp());
@@ -27,7 +29,7 @@ class _MyHomePageState extends State<MyHomePage> {
   TextEditingController _imagePathController = TextEditingController();
   List<String> imagePaths = [];
   List<bool> selectedImages = List<bool>.generate(0, (index) => false);
-
+  ObjectDetection objectDetection = ObjectDetection();
   _insertImage() async {
     final XFile? pickedFile =
         await _picker.pickImage(source: ImageSource.gallery);
@@ -87,6 +89,36 @@ class _MyHomePageState extends State<MyHomePage> {
     _loadImages(); // Refresh the list of images after deletion
   }
 
+  _objectDetect() async {
+    final XFile? pickedFile =
+        await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      String imagePath = pickedFile.path;
+      Uint8List detectedImage = objectDetection.analyseImage(imagePath);
+      _showDetectedImage(detectedImage);
+    }
+  }
+
+  _showDetectedImage(Uint8List detectedImage) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Object Detection Result'),
+          content: Image.memory(detectedImage),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,6 +139,10 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Text('Delete Selected Images'),
             ),
             SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _objectDetect,
+              child: Text('Object Detect'),
+            ),
             Expanded(
               child: GridView.builder(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
