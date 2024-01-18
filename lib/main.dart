@@ -1,9 +1,14 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
+
+import 'package:image/image.dart' as img;
+
 import 'package:image_picker/image_picker.dart';
 import 'database_helper.dart';
 import 'dart:typed_data';
 import 'package:demo/object_detection.dart'; // Replace with the correct import
+import 'package:google_ml_kit/google_ml_kit.dart';
 
 void main() {
   runApp(MyApp());
@@ -30,6 +35,7 @@ class _MyHomePageState extends State<MyHomePage> {
   List<String> imagePaths = [];
   List<bool> selectedImages = List<bool>.generate(0, (index) => false);
   ObjectDetection objectDetection = ObjectDetection();
+
   _insertImage() async {
     final XFile? pickedFile =
         await _picker.pickImage(source: ImageSource.gallery);
@@ -62,14 +68,14 @@ class _MyHomePageState extends State<MyHomePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Image Added'),
-          content: Text('The image has been added successfully.'),
+          title: const Text('Image Added'),
+          content: const Text('The image has been added successfully.'),
           actions: [
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -104,14 +110,14 @@ class _MyHomePageState extends State<MyHomePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Object Detection Result'),
+          title: const Text('Object Detection Result'),
           content: Image.memory(detectedImage),
           actions: [
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -119,11 +125,51 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  _faceDetect() async {
+    final XFile? pickedFile =
+        await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      String imagePath = pickedFile.path;
+      Uint8List detectedImage = await _performFaceDetection(imagePath);
+      _showDetectedImage(detectedImage);
+    }
+  }
+
+  Future<Uint8List> _performFaceDetection(String imagePath) async {
+    final inputImage = InputImage.fromFilePath(imagePath);
+    final options = FaceDetectorOptions(
+      enableContours: true,
+      enableLandmarks: true,
+    );
+    final faceDetector = GoogleMlKit.vision.faceDetector(options);
+
+    try {
+      final List<Face> faces = await faceDetector.processImage(inputImage);
+
+      // Draw bounding boxes on the image
+      final img.Image originalImage =
+          img.decodeImage(File(imagePath).readAsBytesSync())!;
+      for (Face face in faces) {
+        final Rect boundingBox = face.boundingBox!;
+        img.drawRect(originalImage,
+            x1: boundingBox.left.toInt(),
+            y1: boundingBox.top.toInt(),
+            x2: boundingBox.right.toInt(),
+            y2: boundingBox.bottom.toInt(),
+            color: img.ColorFloat16.rgb(255, 0, 0));
+      }
+
+      return Uint8List.fromList(img.encodeJpg(originalImage));
+    } finally {
+      faceDetector.close();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Image Database App'),
+        title: const Text('ML App'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -131,21 +177,27 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             ElevatedButton(
               onPressed: _insertImage,
-              child: Text('Add Image'),
+              child: const Text('Add Image'),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _deleteSelectedImages,
-              child: Text('Delete Selected Images'),
+              child: const Text('Delete Selected Images'),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _objectDetect,
-              child: Text('Object Detect'),
+              child: const Text('Object Detect'),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _faceDetect,
+              child: const Text('Face Detect'),
+            ),
+            const SizedBox(height: 16),
             Expanded(
               child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   crossAxisSpacing: 8.0,
                   mainAxisSpacing: 8.0,
@@ -163,7 +215,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       children: [
                         Image.file(File(imagePaths[index])),
                         if (selectedImages[index])
-                          Positioned(
+                          const Positioned(
                             top: 8.0,
                             right: 8.0,
                             child: Icon(
